@@ -11,7 +11,9 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.ow2.asm:asm:9.7'
+    // 9.10.1+ required: Minecraft 26.x class files report major version 69 (Java 25),
+    // which ASM 9.7 cannot even parse (throws IllegalArgumentException on every class).
+    implementation 'org.ow2.asm:asm:9.10.1'
 }
 
 java {
