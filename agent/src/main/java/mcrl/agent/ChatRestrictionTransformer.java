@@ -31,6 +31,12 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
     private final AtomicReference<String> legacyEnumInternalName = new AtomicReference<>();
     private final AtomicReference<String> modernEnumInternalName = new AtomicReference<>();
     private final ConcurrentHashMap<ClassLoader, ConcurrentHashMap<String, EnumShape>> resourceShapeCache = new ConcurrentHashMap<>();
+    private final boolean verbose;
+
+    // verbose off keeps this quiet in every other Java process JDK_JAVA_OPTIONS reaches, patching still runs regardless.
+    public ChatRestrictionTransformer(boolean verbose) {
+        this.verbose = verbose;
+    }
 
     // Catches the enum and its getter/adder at their own first load; never retransforms.
     @Override
@@ -54,13 +60,13 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
             if (legacyName == null || modernName == null) {
                 EnumShape shape = classifyEnum(reader);
                 if (shape == EnumShape.LEGACY) {
-                    if (legacyEnumInternalName.compareAndSet(null, reader.getClassName())) {
+                    if (legacyEnumInternalName.compareAndSet(null, reader.getClassName()) && verbose) {
                         System.out.println("[mcrl] found legacy chat-restriction enum: " + reader.getClassName());
                     }
                     return null;
                 }
                 if (shape == EnumShape.MODERN) {
-                    if (modernEnumInternalName.compareAndSet(null, reader.getClassName())) {
+                    if (modernEnumInternalName.compareAndSet(null, reader.getClassName()) && verbose) {
                         System.out.println("[mcrl] found modern chat-restriction enum: " + reader.getClassName());
                     }
                     return null;
@@ -72,7 +78,7 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
             if (legacyName == null) {
                 for (String candidate : discoverLegacyGetterCandidates(reader)) {
                     if (classifyResource(loader, candidate) == EnumShape.LEGACY) {
-                        if (legacyEnumInternalName.compareAndSet(null, candidate)) {
+                        if (legacyEnumInternalName.compareAndSet(null, candidate) && verbose) {
                             System.out.println("[mcrl] found legacy chat-restriction enum: " + candidate
                                     + " (via getter in " + className + ")");
                         }
@@ -87,7 +93,7 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
             if (modernName == null) {
                 for (String candidate : discoverModernAdderCandidates(reader)) {
                     if (classifyResource(loader, candidate) == EnumShape.MODERN) {
-                        if (modernEnumInternalName.compareAndSet(null, candidate)) {
+                        if (modernEnumInternalName.compareAndSet(null, candidate) && verbose) {
                             System.out.println("[mcrl] found modern chat-restriction enum: " + candidate
                                     + " (via adder in " + className + ")");
                         }
@@ -98,8 +104,10 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
 
             return null;
         } catch (Throwable t) {
-            System.err.println("[mcrl] failed to inspect " + className);
-            t.printStackTrace();
+            if (verbose) {
+                System.err.println("[mcrl] failed to inspect " + className);
+                t.printStackTrace();
+            }
             return null;
         }
     }
@@ -219,7 +227,9 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
                     return mv;
                 }
                 patched[0] = true;
-                System.out.println("[mcrl] patching (legacy) " + className + "#" + name + descriptor);
+                if (verbose) {
+                    System.out.println("[mcrl] patching (legacy) " + className + "#" + name + descriptor);
+                }
                 return new MethodVisitor(Opcodes.ASM9, mv) {
                     @Override
                     public void visitInsn(int opcode) {
@@ -300,7 +310,9 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
                     return mv;
                 }
                 patched[0] = true;
-                System.out.println("[mcrl] patching (modern) " + className + "#" + name + descriptor);
+                if (verbose) {
+                    System.out.println("[mcrl] patching (modern) " + className + "#" + name + descriptor);
+                }
                 return new MethodVisitor(Opcodes.ASM9, mv) {
                     @Override
                     public void visitCode() {

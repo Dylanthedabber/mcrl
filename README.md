@@ -151,9 +151,12 @@ simple enum check, and it's handled by other tools like No Chat Reports or
 FreedomChat, not this one.
 
 One side effect worth knowing about: `JDK_JAVA_OPTIONS` is a global setting, so it
-applies to every Java program you run afterward, not just Minecraft. It's harmless
-since the agent does nothing on anything that isn't the game, but you will see a
-one-line notice print to the console of whatever else you run.
+applies to every Java program you run afterward, not just Minecraft. It's harmless,
+the agent does nothing on anything that isn't the game, and checks whether the
+classpath or launch command looks like Minecraft before printing anything, so other
+Java programs' logs stay clean. The one thing that can't be suppressed is the JVM's
+own `NOTE: Picked up JDK_JAVA_OPTIONS...` line, which every Java 9+ runtime prints
+before any agent code even runs.
 
 The agent itself needs Java 8 or newer to even load, which is about as broad as
 Minecraft's own runtime requirements get across every version.

@@ -9,9 +9,20 @@ public final class McrlAgent {
     }
 
     public static void premain(String agentArgs, Instrumentation inst) {
-        System.out.println("[mcrl] installed, scanning for the client chat-restriction enum");
+        // JDK_JAVA_OPTIONS is global, so this loads into every Java process on the system; stay
+        // quiet for anything that doesn't look like Minecraft instead of spamming unrelated logs.
+        boolean verbose = looksLikeMinecraft();
+        if (verbose) {
+            System.out.println("[mcrl] installed, scanning for the client chat-restriction enum");
+        }
         // retransformClasses() is never used, so false is fine here.
-        inst.addTransformer(new ChatRestrictionTransformer(), false);
+        inst.addTransformer(new ChatRestrictionTransformer(verbose), false);
+    }
+
+    private static boolean looksLikeMinecraft() {
+        String classPath = System.getProperty("java.class.path", "");
+        String command = System.getProperty("sun.java.command", "");
+        return classPath.toLowerCase().contains("minecraft") || command.toLowerCase().contains("minecraft");
     }
 
     public static void agentmain(String agentArgs, Instrumentation inst) {
