@@ -7,13 +7,16 @@ import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.lang.instrument.ClassFileTransformer;
-import java.lang.instrument.Instrumentation;
-import java.lang.reflect.Method;
 import java.security.ProtectionDomain;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -41,6 +44,33 @@ import java.util.concurrent.atomic.AtomicReference;
  * obfuscation/remapping where field-symbol matching doesn't), so the same jar
  * works across every loader (Forge/NeoForge/Fabric/Quilt) and true unmodified
  * vanilla, for whichever era of the game is actually running.
+ *
+ * IMPORTANT: there is deliberately no retransformClasses() anywhere in this file.
+ * An earlier version used it to patch a getter/adder class that had already
+ * loaded before the enum was identified (which happens routinely - the class
+ * holding the method usually loads at startup, long before the enum is ever
+ * actually touched, e.g. the moment a server connection is opened). That version
+ * went through three iterations, and all three broke, confirmed by direct
+ * testing, not theory: calling retransformClasses() synchronously from within
+ * transform() while it's processing the enum's own definition crashes with
+ * "LinkageError: attempted duplicate class definition" for the enum itself, no
+ * matter whether a Class object for the enum is ever requested or not. Moving
+ * the retransformClasses() call to a background thread avoids that crash but
+ * loses a real race instead - confirmed live against an actual account, where
+ * the game built its per-connection permissions object with the unpatched value
+ * because the background thread hadn't finished yet; only reconnecting within
+ * the same session (by which point the background thread had caught up) worked.
+ * Having the original thread join() on that background thread to close the race
+ * deadlocks instead, confirmed by every single test run hanging. So instead of
+ * ever patching an already-loaded class after the fact, this scans every class
+ * as it loads for the getter/adder *shape* even before the enum's identity is
+ * known, using the return/parameter type name straight out of the method
+ * descriptor string, then confirms that candidate by fetching its bytes as a
+ * plain classloader resource (getResourceAsStream, never a real class load or
+ * Class object) and running the exact same constant-string check used to
+ * recognize the enum normally. That means the getter/adder class gets caught
+ * and patched at its own natural first load no matter which of it or the enum
+ * loads first, so there is never an already-loaded class left to retransform.
  */
 public class ChatRestrictionTransformer implements ClassFileTransformer {
 
@@ -49,13 +79,8 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
     private static final Set<String> LEGACY_REQUIRED = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
             "ENABLED", "DISABLED_BY_OPTIONS", "DISABLED_BY_PROFILE", "DISABLED_BY_LAUNCHER")));
 
-    private final Instrumentation instrumentation;
     private final AtomicReference<String> legacyEnumInternalName = new AtomicReference<>();
     private final AtomicReference<String> modernEnumInternalName = new AtomicReference<>();
-
-    public ChatRestrictionTransformer(Instrumentation instrumentation) {
-        this.instrumentation = instrumentation;
-    }
 
     @Override
     public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
@@ -67,19 +92,16 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
             ClassReader reader = new ClassReader(classfileBuffer);
 
             EnumShape shape = classifyEnum(reader);
-            if (shape == EnumShape.LEGACY && legacyEnumInternalName.compareAndSet(null, reader.getClassName())) {
-                String enumInternalName = reader.getClassName();
-                System.out.println("[mcrl] found legacy chat-restriction enum: " + enumInternalName);
-                retransformLaterFor(enumInternalName, loader);
+            if (shape == EnumShape.LEGACY) {
+                if (legacyEnumInternalName.compareAndSet(null, reader.getClassName())) {
+                    System.out.println("[mcrl] found legacy chat-restriction enum: " + reader.getClassName());
+                }
                 return null;
             }
-            if (shape == EnumShape.MODERN && modernEnumInternalName.compareAndSet(null, reader.getClassName())) {
-                String enumInternalName = reader.getClassName();
-                System.out.println("[mcrl] found modern chat-restriction enum: " + enumInternalName);
-                retransformLaterFor(enumInternalName, loader);
-                return null;
-            }
-            if (shape != EnumShape.NONE) {
+            if (shape == EnumShape.MODERN) {
+                if (modernEnumInternalName.compareAndSet(null, reader.getClassName())) {
+                    System.out.println("[mcrl] found modern chat-restriction enum: " + reader.getClassName());
+                }
                 return null;
             }
 
@@ -87,10 +109,32 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
             if (legacyName != null && hasLegacyGetter(reader, legacyName)) {
                 return patchLegacyGetter(reader, legacyName, className);
             }
+            if (legacyName == null) {
+                for (String candidate : discoverLegacyGetterCandidates(reader)) {
+                    if (classifyResource(loader, candidate) == EnumShape.LEGACY) {
+                        if (legacyEnumInternalName.compareAndSet(null, candidate)) {
+                            System.out.println("[mcrl] found legacy chat-restriction enum: " + candidate
+                                    + " (via getter in " + className + ")");
+                        }
+                        return patchLegacyGetter(reader, candidate, className);
+                    }
+                }
+            }
 
             String modernName = modernEnumInternalName.get();
             if (modernName != null && hasModernAdder(reader, modernName)) {
                 return patchModernAdder(reader, modernName, className, loader);
+            }
+            if (modernName == null) {
+                for (String candidate : discoverModernAdderCandidates(reader)) {
+                    if (classifyResource(loader, candidate) == EnumShape.MODERN) {
+                        if (modernEnumInternalName.compareAndSet(null, candidate)) {
+                            System.out.println("[mcrl] found modern chat-restriction enum: " + candidate
+                                    + " (via adder in " + className + ")");
+                        }
+                        return patchModernAdder(reader, candidate, className, loader);
+                    }
+                }
             }
 
             return null;
@@ -154,7 +198,53 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
         return EnumShape.NONE;
     }
 
+    /**
+     * Fetches a candidate class's bytes as a plain classloader resource and runs
+     * the same check classifyEnum does on it - deliberately not a real class load
+     * (no Class.forName, no defineClass). getResourceAsStream only ever reads
+     * bytes off the classpath/jar; it never asks the classloader to define
+     * anything, so calling it here for some other, unrelated, not-yet-loaded
+     * class carries none of the reentrancy risk retransformClasses() did.
+     */
+    private EnumShape classifyResource(ClassLoader loader, String candidateInternalName) {
+        ClassLoader effectiveLoader = loader != null ? loader : ClassLoader.getSystemClassLoader();
+        try (InputStream in = effectiveLoader.getResourceAsStream(candidateInternalName + ".class")) {
+            if (in == null) {
+                return EnumShape.NONE;
+            }
+            return classifyEnum(new ClassReader(readAllBytes(in)));
+        } catch (Throwable t) {
+            return EnumShape.NONE;
+        }
+    }
+
+    private static byte[] readAllBytes(InputStream in) throws java.io.IOException {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        byte[] chunk = new byte[8192];
+        int read;
+        while ((read = in.read(chunk)) != -1) {
+            buffer.write(chunk, 0, read);
+        }
+        return buffer.toByteArray();
+    }
+
     // ---- legacy shape: zero-arg getter returning the enum ----
+
+    /** Every distinct return type of a non-static zero-arg getter in this class, in declaration order. */
+    private List<String> discoverLegacyGetterCandidates(ClassReader reader) {
+        Set<String> found = new LinkedHashSet<>();
+        reader.accept(new ClassVisitor(Opcodes.ASM9) {
+            @Override
+            public MethodVisitor visitMethod(int access, String name, String descriptor,
+                                              String signature, String[] exceptions) {
+                if ((access & Opcodes.ACC_STATIC) == 0 && descriptor.startsWith("()L") && descriptor.endsWith(";")) {
+                    found.add(descriptor.substring(3, descriptor.length() - 1));
+                }
+                return null;
+            }
+        }, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+        return new ArrayList<>(found);
+    }
 
     private boolean hasLegacyGetter(ClassReader reader, String enumInternalName) {
         String targetDescriptor = "()L" + enumInternalName + ";";
@@ -230,6 +320,27 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
 
     // ---- modern shape: fluent "addRestriction(Enum) -> same builder type" ----
 
+    /** Every distinct single-parameter type of a non-static fluent setter (returns its own declaring class). */
+    private List<String> discoverModernAdderCandidates(ClassReader reader) {
+        Set<String> found = new LinkedHashSet<>();
+        String selfReturn = ")L" + reader.getClassName() + ";";
+        reader.accept(new ClassVisitor(Opcodes.ASM9) {
+            @Override
+            public MethodVisitor visitMethod(int access, String name, String descriptor,
+                                              String signature, String[] exceptions) {
+                if ((access & Opcodes.ACC_STATIC) != 0 || !descriptor.startsWith("(L")) {
+                    return null;
+                }
+                int paramEnd = descriptor.indexOf(';');
+                if (paramEnd > 0 && descriptor.substring(paramEnd + 1).equals(selfReturn)) {
+                    found.add(descriptor.substring(2, paramEnd));
+                }
+                return null;
+            }
+        }, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+        return new ArrayList<>(found);
+    }
+
     private boolean hasModernAdder(ClassReader reader, String enumInternalName) {
         String targetDescriptor = "(L" + enumInternalName + ";)L" + reader.getClassName() + ";";
         boolean[] found = {false};
@@ -292,51 +403,5 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
                 return loader != null ? loader : super.getClassLoader();
             }
         };
-    }
-
-    /**
-     * The enum is usually only resolved (and thus first loaded) the moment the
-     * player opens chat for the first time, which can easily be after the class
-     * holding the target method has already loaded and been passed through
-     * untouched. Once we learn the enum's real name, retransform any already-loaded
-     * class matching the given shape test, so we don't miss that case.
-     */
-    private void retransformLaterFor(String enumInternalName, ClassLoader loader) {
-        Thread worker = new Thread(() -> {
-            try {
-                ClassLoader lookupLoader = loader != null ? loader : ClassLoader.getSystemClassLoader();
-                Class<?> enumClass = Class.forName(enumInternalName.replace('/', '.'), false, lookupLoader);
-
-                for (Class<?> loadedClass : instrumentation.getAllLoadedClasses()) {
-                    if (!instrumentation.isModifiableClass(loadedClass)) {
-                        continue;
-                    }
-                    try {
-                        boolean matches = false;
-                        for (Method method : loadedClass.getDeclaredMethods()) {
-                            Class<?>[] params = method.getParameterTypes();
-                            boolean legacyShape = params.length == 0 && method.getReturnType() == enumClass;
-                            boolean modernShape = params.length == 1 && params[0] == enumClass
-                                    && method.getReturnType() == loadedClass;
-                            if (legacyShape || modernShape) {
-                                matches = true;
-                                break;
-                            }
-                        }
-                        if (matches) {
-                            System.out.println("[mcrl] retransforming already-loaded " + loadedClass.getName());
-                            instrumentation.retransformClasses(loadedClass);
-                        }
-                    } catch (Throwable ignored) {
-                        // Not introspectable right now, if it loads again fresh it's still covered by transform().
-                    }
-                }
-            } catch (Throwable t) {
-                System.err.println("[mcrl] could not scan already-loaded classes for the chat gate");
-                t.printStackTrace();
-            }
-        }, "mcrl-retransform");
-        worker.setDaemon(true);
-        worker.start();
     }
 }

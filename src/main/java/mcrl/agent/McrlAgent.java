@@ -16,7 +16,9 @@ public final class McrlAgent {
 
     public static void premain(String agentArgs, Instrumentation inst) {
         System.out.println("[mcrl] installed, scanning for the client chat-restriction enum");
-        inst.addTransformer(new ChatRestrictionTransformer(inst), true);
+        // false: retransformClasses() is never used (see ChatRestrictionTransformer's
+        // class doc for why), so retransform support isn't needed.
+        inst.addTransformer(new ChatRestrictionTransformer(), false);
     }
 
     public static void agentmain(String agentArgs, Instrumentation inst) {
