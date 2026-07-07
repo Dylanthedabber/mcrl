@@ -31,6 +31,12 @@ public final class McrlAgent {
             inst.addTransformer(new AccountFlagsTransformer(config.extras, config.blockTelemetry,
                     config.blockProfanityFilter, verbose), false);
         }
+        // Same "extras" toggle as Realms/servers/friends: a locally-flagged forced-name-change or
+        // banned-skin action otherwise blocks connecting to third-party servers over nothing they
+        // enforce themselves.
+        if (config.extras) {
+            inst.addTransformer(new ProfileActionsTransformer(verbose), false);
+        }
     }
 
     // Fires once, well after a real game should have loaded the chat-restriction enum; if it

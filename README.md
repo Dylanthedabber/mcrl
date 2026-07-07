@@ -206,6 +206,12 @@ the jar, since this agent applies globally rather than per-instance, one shared 
 covers every instance instead of a per-instance mod config. Change your mind later
 without reinstalling, rerun the install script and choose Reconfigure.
 
+That same "unlock" toggle also stops a locally-flagged forced-name-change or banned-skin
+action from blocking third-party server connections (MC 1.20.4 and up; older versions'
+authlib doesn't have this API at all, so it's silently skipped there, same as every
+other flag-availability check on this page). Mojang's own servers and Realms enforce
+their own moderation independently of this and are unaffected either way.
+
 This patches a different target than the chat check: Mojang's `authlib` library,
 which unlike Minecraft's own classes is a plain, unobfuscated shared dependency with
 stable names across every loader and version, so it's matched by real class/method
@@ -227,10 +233,10 @@ account API's own flag list has grown over time regardless, friends support in
 particular is a recent addition, so on older Minecraft versions whichever flags
 aren't present yet get silently skipped rather than causing an error.
 
-Not covered: bypassing a banned username, a real capability No Chat Restrictions has
-that this doesn't (yet), it lives on Minecraft's own obfuscated classes rather than
-authlib's stable ones, so it would need the same kind of per-version shape research
-the chat patch needed, not a quick add.
+Banned-username bypass, a real capability No Chat Restrictions also has, turned out to
+live in authlib after all (`ProfileResult.actions()`, an unobfuscated record accessor
+returning a `Set<ProfileActionType>`), not in Minecraft's own obfuscated classes as
+originally assumed here; see [`ProfileActionsTransformer`](agent/src/main/java/mcrl/agent/ProfileActionsTransformer.java).
 
 Prefer to do it by hand instead of the install script's prompts? Put this next to
 your `mcrl.jar` as `config.json` (whole file is optional, no file at all means none
