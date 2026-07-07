@@ -7,9 +7,15 @@ JAR_URL="https://github.com/Sm0keSkreen/mcrl/releases/latest/download/mcrl.jar"
 DEFAULT_DIR="$HOME/.local/share/mcrl"
 TAG_LINE="# mcrl (added by install.sh)"
 ENV_D_FILE="$HOME/.config/environment.d/mcrl.conf"
+LAUNCH_AGENT_LABEL="space.mcrl.env"
+LAUNCH_AGENT_PLIST="$HOME/Library/LaunchAgents/$LAUNCH_AGENT_LABEL.plist"
 
 # Known Flatpak Minecraft launchers, pre-selected by default in the picker below.
 KNOWN_FLATPAK_APPS="org.prismlauncher.PrismLauncher org.polymc.PolyMC com.modrinth.ModrinthApp com.mojang.Minecraft"
+
+is_macos() {
+    [ "$(uname -s)" = "Darwin" ]
+}
 
 # environment.d is only loaded by systemd's per-user manager (Linux only).
 has_systemd_user() {
@@ -84,11 +90,23 @@ if [ "$CHOICE" = "2" ]; then
     FOUND=0
     JAR_PATH=""
 
+    if [ -f "$LAUNCH_AGENT_PLIST" ]; then
+        LINE=$(grep -o 'javaagent:[^<]*mcrl\.jar' "$LAUNCH_AGENT_PLIST" | head -n1 || true)
+        if [ -n "$LINE" ]; then
+            FOUND=1
+            JAR_PATH="${LINE#javaagent:}"
+            launchctl bootout "gui/$(id -u)" "$LAUNCH_AGENT_PLIST" >/dev/null 2>&1 || true
+            launchctl unsetenv JDK_JAVA_OPTIONS >/dev/null 2>&1 || true
+            rm -f "$LAUNCH_AGENT_PLIST"
+            echo "Unloaded and removed $LAUNCH_AGENT_PLIST."
+        fi
+    fi
+
     if [ -f "$ENV_D_FILE" ]; then
         LINE=$(grep -o 'javaagent:[^"]*mcrl\.jar' "$ENV_D_FILE" | head -n1 || true)
         if [ -n "$LINE" ]; then
             FOUND=1
-            JAR_PATH="${LINE#javaagent:}"
+            JAR_PATH="${JAR_PATH:-${LINE#javaagent:}}"
             rm -f "$ENV_D_FILE"
             echo "Removed $ENV_D_FILE."
         fi
@@ -120,7 +138,7 @@ if [ "$CHOICE" = "2" ]; then
     fi
 
     if [ "$FOUND" = "0" ]; then
-        echo "Didn't find an mcrl install (no environment.d entry, no shell rc entry, no matching Flatpak override)."
+        echo "Didn't find an mcrl install (no LaunchAgent, no environment.d entry, no shell rc entry, no matching Flatpak override)."
         echo "Nothing to do."
         exit 0
     fi
@@ -161,7 +179,32 @@ if [ ! -f "$JAR_PATH" ]; then
     exit 1
 fi
 
-if has_systemd_user; then
+if is_macos; then
+    mkdir -p "$(dirname "$LAUNCH_AGENT_PLIST")"
+    cat > "$LAUNCH_AGENT_PLIST" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>$LAUNCH_AGENT_LABEL</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/launchctl</string>
+        <string>setenv</string>
+        <string>JDK_JAVA_OPTIONS</string>
+        <string>-javaagent:$JAR_PATH</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+PLIST
+    launchctl bootout "gui/$(id -u)" "$LAUNCH_AGENT_PLIST" >/dev/null 2>&1 || true
+    launchctl bootstrap "gui/$(id -u)" "$LAUNCH_AGENT_PLIST"
+    echo "Wrote and loaded $LAUNCH_AGENT_PLIST (covers native, non-Flatpak launchers)."
+    NATIVE_NOTE="already active for this login session, no restart needed for it specifically"
+elif has_systemd_user; then
     mkdir -p "$(dirname "$ENV_D_FILE")"
     echo "JDK_JAVA_OPTIONS=\"-javaagent:$JAR_PATH\"" > "$ENV_D_FILE"
     echo "Wrote $ENV_D_FILE (covers native, non-Flatpak launchers)."
