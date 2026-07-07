@@ -10,6 +10,13 @@
 [![Fabric](https://img.shields.io/badge/Fabric-yes-4c1)]()
 [![Quilt](https://img.shields.io/badge/Quilt-yes-4c1)]()
 
+## Quick install (Windows)
+
+Download [`install.bat`](install.bat), double-click it, follow the prompt. That's the
+whole thing, no admin rights, no manual setup. See [Install
+(Windows)](#install-windows) below for what it actually does, the PowerShell
+alternative, and the fully manual fallback.
+
 A JVM agent that clears the Microsoft/Xbox account-level "chat disabled" check on the
 Minecraft Java client. It doesn't touch chat signing or reporting, that's a separate
 system (see below).
