@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+echo ""
+echo "mcrl.jar is installed at /usr/share/mcrl/mcrl.jar"
+echo "One-time setup still needed: point JDK_JAVA_OPTIONS at that path (see the mcrl"
+echo "README), or just run the full installer instead, which does that for you:"
+echo "  curl -fsSL https://github.com/Sm0keSkreen/mcrl/releases/latest/download/install.sh | bash"
+
+exit 0
