@@ -26,10 +26,14 @@ final class McrlConfig {
         if (configFile != null && configFile.isFile()) {
             try {
                 String json = new String(Files.readAllBytes(configFile.toPath()), StandardCharsets.UTF_8);
-                boolean extras = readBoolean(json, "extras", false);
-                boolean allowTelemetry = readBoolean(json, "allowTelemetry", false);
-                boolean allowProfanityFilter = readBoolean(json, "allowProfanityFilter", false);
-                return new McrlConfig(extras, !allowTelemetry, !allowProfanityFilter);
+                boolean extras = Boolean.TRUE.equals(readBoolean(json, "extras"));
+                // A missing allow* key means "leave alone" (same as no config.json at all), not
+                // "block"; only an explicit false actively strips that flag if the account has it.
+                Boolean allowTelemetry = readBoolean(json, "allowTelemetry");
+                Boolean allowProfanityFilter = readBoolean(json, "allowProfanityFilter");
+                boolean blockTelemetry = Boolean.FALSE.equals(allowTelemetry);
+                boolean blockProfanityFilter = Boolean.FALSE.equals(allowProfanityFilter);
+                return new McrlConfig(extras, blockTelemetry, blockProfanityFilter);
             } catch (Throwable t) {
                 System.err.println("[mcrl] failed to read " + configFile + ", ignoring it");
             }
@@ -54,8 +58,9 @@ final class McrlConfig {
         }
     }
 
-    private static boolean readBoolean(String json, String key, boolean defaultValue) {
+    // null means the key is absent, distinct from an explicit false.
+    private static Boolean readBoolean(String json, String key) {
         Matcher m = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*(true|false)").matcher(json);
-        return m.find() ? Boolean.parseBoolean(m.group(1)) : defaultValue;
+        return m.find() ? Boolean.parseBoolean(m.group(1)) : null;
     }
 }

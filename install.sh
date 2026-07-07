@@ -182,6 +182,11 @@ if [ "$CHOICE" = "3" ]; then
         echo "Didn't find an existing mcrl install to reconfigure. Run install first."
         exit 1
     fi
+    if [ ! -d "$(dirname "$JAR_PATH")" ]; then
+        echo "mcrl is configured to use $JAR_PATH, but that install directory no longer exists."
+        echo "Run install again to recreate it."
+        exit 1
+    fi
     echo "Found existing install at $JAR_PATH"
     echo ""
     prompt_and_write_config "$(dirname "$JAR_PATH")"

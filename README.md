@@ -205,8 +205,12 @@ authlib's stable ones, so it would need the same kind of per-version shape resea
 the chat patch needed, not a quick add.
 
 Prefer to do it by hand instead of the install script's prompts? Put this next to
-your `mcrl.jar` as `config.json` (all three fields optional, default `false`, and the
-whole file is optional too, no file at all means none of this applies):
+your `mcrl.jar` as `config.json` (whole file is optional, no file at all means none
+of this applies). All three fields are optional too: a missing `extras` defaults to
+`false` (off), while a missing `allowTelemetry` or `allowProfanityFilter` means leave
+that flag alone, whatever the account already has stays as-is. Only an explicit
+`false` actively strips a flag the account has, and only an explicit `true` counts
+as opting in:
 
 ```json
 {

@@ -83,7 +83,8 @@ public class AccountFlagsTransformer implements ClassFileTransformer {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor,
                                               String signature, String[] exceptions) {
-                if (TARGET_DESCRIPTOR.equals(descriptor) && (access & Opcodes.ACC_STATIC) == 0) {
+                if (TARGET_DESCRIPTOR.equals(descriptor)
+                        && (access & (Opcodes.ACC_STATIC | Opcodes.ACC_ABSTRACT)) == 0) {
                     found[0] = true;
                 }
                 return null;
@@ -205,7 +206,8 @@ public class AccountFlagsTransformer implements ClassFileTransformer {
             public MethodVisitor visitMethod(int access, String name, String descriptor,
                                               String signature, String[] exceptions) {
                 MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
-                if (!TARGET_DESCRIPTOR.equals(descriptor) || (access & Opcodes.ACC_STATIC) != 0) {
+                if (!TARGET_DESCRIPTOR.equals(descriptor)
+                        || (access & (Opcodes.ACC_STATIC | Opcodes.ACC_ABSTRACT)) != 0) {
                     return mv;
                 }
                 patched[0] = true;
@@ -214,11 +216,6 @@ public class AccountFlagsTransformer implements ClassFileTransformer {
                             + " force=" + shape.flagsToForce + " strip=" + shape.flagsToStrip);
                 }
                 return new MethodVisitor(Opcodes.ASM9, mv) {
-                    @Override
-                    public void visitMaxs(int maxStack, int maxLocals) {
-                        super.visitMaxs(maxStack, maxLocals + 2);
-                    }
-
                     @Override
                     public void visitInsn(int opcode) {
                         if (opcode == Opcodes.ARETURN) {

@@ -54,10 +54,12 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
             ClassReader reader = new ClassReader(classfileBuffer);
             String legacyName = legacyEnumInternalName.get();
             String modernName = modernEnumInternalName.get();
+            // A single running game only ever has one of these two shapes, never both, so once
+            // either is confirmed the other will never appear; stop searching for it at all
+            // (classifyEnum and both discovery loops) instead of scanning every class forever.
+            boolean shapeUnknown = legacyName == null && modernName == null;
 
-            // Once both enums are known, classifyEnum can never find anything new; skip it for
-            // the rest of the game's life instead of paying a full <clinit> scan per class forever.
-            if (legacyName == null || modernName == null) {
+            if (shapeUnknown) {
                 EnumShape shape = classifyEnum(reader);
                 if (shape == EnumShape.LEGACY) {
                     if (legacyEnumInternalName.compareAndSet(null, reader.getClassName()) && verbose) {
@@ -75,7 +77,7 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
             if (legacyName != null && hasLegacyGetter(reader, legacyName)) {
                 return patchLegacyGetter(reader, legacyName, className, loader);
             }
-            if (legacyName == null) {
+            if (shapeUnknown) {
                 for (String candidate : discoverLegacyGetterCandidates(reader)) {
                     if (classifyResource(loader, candidate) == EnumShape.LEGACY) {
                         if (legacyEnumInternalName.compareAndSet(null, candidate) && verbose) {
@@ -90,7 +92,7 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
             if (modernName != null && hasModernAdder(reader, modernName)) {
                 return patchModernAdder(reader, modernName, className, loader);
             }
-            if (modernName == null) {
+            if (shapeUnknown) {
                 for (String candidate : discoverModernAdderCandidates(reader)) {
                     if (classifyResource(loader, candidate) == EnumShape.MODERN) {
                         if (modernEnumInternalName.compareAndSet(null, candidate) && verbose) {
