@@ -18,6 +18,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 // Finds and patches Minecraft's chat-restriction check by bytecode shape, not by name.
@@ -29,6 +30,7 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
 
     private final AtomicReference<String> legacyEnumInternalName = new AtomicReference<>();
     private final AtomicReference<String> modernEnumInternalName = new AtomicReference<>();
+    private final ConcurrentHashMap<ClassLoader, ConcurrentHashMap<String, EnumShape>> resourceShapeCache = new ConcurrentHashMap<>();
 
     // Catches the enum and its getter/adder at their own first load; never retransforms.
     @Override
@@ -44,22 +46,26 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
         }
         try {
             ClassReader reader = new ClassReader(classfileBuffer);
-
-            EnumShape shape = classifyEnum(reader);
-            if (shape == EnumShape.LEGACY) {
-                if (legacyEnumInternalName.compareAndSet(null, reader.getClassName())) {
-                    System.out.println("[mcrl] found legacy chat-restriction enum: " + reader.getClassName());
-                }
-                return null;
-            }
-            if (shape == EnumShape.MODERN) {
-                if (modernEnumInternalName.compareAndSet(null, reader.getClassName())) {
-                    System.out.println("[mcrl] found modern chat-restriction enum: " + reader.getClassName());
-                }
-                return null;
-            }
-
             String legacyName = legacyEnumInternalName.get();
+            String modernName = modernEnumInternalName.get();
+
+            // Once both enums are known, classifyEnum can never find anything new; skip it for
+            // the rest of the game's life instead of paying a full <clinit> scan per class forever.
+            if (legacyName == null || modernName == null) {
+                EnumShape shape = classifyEnum(reader);
+                if (shape == EnumShape.LEGACY) {
+                    if (legacyEnumInternalName.compareAndSet(null, reader.getClassName())) {
+                        System.out.println("[mcrl] found legacy chat-restriction enum: " + reader.getClassName());
+                    }
+                    return null;
+                }
+                if (shape == EnumShape.MODERN) {
+                    if (modernEnumInternalName.compareAndSet(null, reader.getClassName())) {
+                        System.out.println("[mcrl] found modern chat-restriction enum: " + reader.getClassName());
+                    }
+                    return null;
+                }
+            }
             if (legacyName != null && hasLegacyGetter(reader, legacyName)) {
                 return patchLegacyGetter(reader, legacyName, className, loader);
             }
@@ -75,7 +81,6 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
                 }
             }
 
-            String modernName = modernEnumInternalName.get();
             if (modernName != null && hasModernAdder(reader, modernName)) {
                 return patchModernAdder(reader, modernName, className, loader);
             }
@@ -135,17 +140,26 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
         return EnumShape.NONE;
     }
 
-    // Reads a candidate class's bytes as a plain resource, never a real class load.
+    // Reads a candidate class's bytes as a plain resource, never a real class load; cached per
+    // loader since the same non-matching candidate often turns up from several classes in a row.
     private EnumShape classifyResource(ClassLoader loader, String candidateInternalName) {
         ClassLoader effectiveLoader = loader != null ? loader : ClassLoader.getSystemClassLoader();
-        try (InputStream in = effectiveLoader.getResourceAsStream(candidateInternalName + ".class")) {
-            if (in == null) {
-                return EnumShape.NONE;
-            }
-            return classifyEnum(new ClassReader(readAllBytes(in)));
-        } catch (Throwable t) {
-            return EnumShape.NONE;
+        ConcurrentHashMap<String, EnumShape> cache =
+                resourceShapeCache.computeIfAbsent(effectiveLoader, l -> new ConcurrentHashMap<>());
+        EnumShape cached = cache.get(candidateInternalName);
+        if (cached != null) {
+            return cached;
         }
+        EnumShape shape = EnumShape.NONE;
+        try (InputStream in = effectiveLoader.getResourceAsStream(candidateInternalName + ".class")) {
+            if (in != null) {
+                shape = classifyEnum(new ClassReader(readAllBytes(in)));
+            }
+        } catch (Throwable t) {
+            shape = EnumShape.NONE;
+        }
+        cache.put(candidateInternalName, shape);
+        return shape;
     }
 
     private static byte[] readAllBytes(InputStream in) throws java.io.IOException {
