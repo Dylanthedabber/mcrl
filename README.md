@@ -40,32 +40,38 @@ should look like. (An earlier version of this file said vanilla didn't work befo
 
 ## Install (Windows)
 
-Hit `Win + R`, paste this, hit Enter:
+Download [`install.ps1`](install.ps1) from this repo, right-click it, choose "Run
+with PowerShell," and follow the prompt (install or uninstall, and where). It
+downloads `mcrl.jar` and points `JDK_JAVA_OPTIONS` at it for you, defaulting to
+`%LOCALAPPDATA%\Mcrl` if you don't pick a different folder. Same script handles
+removing it later, pick uninstall and it clears the environment variable and
+optionally deletes the folder.
 
-```
-powershell -Command "$dir = \"$env:LOCALAPPDATA\Mcrl\"; New-Item -ItemType Directory -Force -Path $dir | Out-Null; Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Dylanthedabber/mcrl/master/mcrl.jar' -OutFile \"$dir\mcrl.jar\"; setx JDK_JAVA_OPTIONS \"-javaagent:$dir\mcrl.jar\""
-```
-
-That downloads the jar straight from this repo into `%LOCALAPPDATA%\Mcrl\mcrl.jar` and
-sets the environment variable in one shot, no manual folder setup needed.
-`%LOCALAPPDATA%` is a good spot for this specifically because it's hidden by default
+`%LOCALAPPDATA%` is a good default spot specifically because it's hidden by default
 and not somewhere you'd stumble across while tidying up Documents or Desktop, so
-there's no risk of deleting it by accident later. Then close every open Minecraft
-launcher window (official launcher, PrismLauncher, CurseForge, whatever you use) and
-reopen.
+there's no risk of deleting it by accident later.
 
-That's it, this sticks around from now on. No per-instance JVM argument, no
-re-running this after updates, and no re-running it after Mcrl itself gets updated
-either since it always pulls the current jar. Works on any Minecraft Java version, any
-loader, and unmodified vanilla.
+This doesn't run as a pasted Win+R one-liner on purpose. A clipboard command pasted
+into Win+R and executed is exactly the shape of "ClickFix," a real and currently very
+common malware delivery technique (fake verification pages telling people to paste
+something into Run), and Windows Defender has a behavioral detection for that pattern
+specifically, regardless of what the pasted command actually does. Downloading a
+script file and running it from disk avoids that pattern entirely, so at most you'll
+see the normal "Windows protected your PC" SmartScreen prompt every unsigned tool from
+the internet gets, click "More info" then "Run anyway."
 
-Prefer not to run something that downloads off the internet via Win+R? Fair. Manual
-version: clone or download this repo, put the whole folder at `%LOCALAPPDATA%\Mcrl` so
-you end up with `%LOCALAPPDATA%\Mcrl\mcrl.jar`, then just run the `setx` part yourself:
+Once it's set, that's it, this sticks around from now on. No per-instance JVM
+argument, no re-running this after Minecraft updates, and no re-running it after Mcrl
+itself gets updated either since it always pulls the current jar. Works on any
+Minecraft Java version, any loader, and unmodified vanilla. Just close every open
+Minecraft launcher window (official launcher, PrismLauncher, CurseForge, whatever you
+use) and reopen after running it.
 
-```
-cmd /c setx JDK_JAVA_OPTIONS "-javaagent:%LOCALAPPDATA%\Mcrl\mcrl.jar"
-```
+Prefer not to run a script at all? Manual version: download `mcrl.jar` from this repo,
+put it somewhere permanent like `%LOCALAPPDATA%\Mcrl\mcrl.jar`, then open Start,
+search "environment variables," choose "Edit environment variables for your account,"
+and add a new variable named `JDK_JAVA_OPTIONS` with the value
+`-javaagent:%LOCALAPPDATA%\Mcrl\mcrl.jar` (expanded to your actual path).
 
 ## Linux / macOS
 
