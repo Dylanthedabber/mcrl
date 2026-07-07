@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>mcrl</id>
+    <version>1.3.0</version>
+    <title>mcrl</title>
+    <authors>Sm0keSkreen</authors>
+    <projectUrl>https://github.com/Sm0keSkreen/mcrl</projectUrl>
+    <licenseUrl>https://github.com/Sm0keSkreen/mcrl/blob/master/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectSourceUrl>https://github.com/Sm0keSkreen/mcrl</projectSourceUrl>
+    <bugTrackerUrl>https://github.com/Sm0keSkreen/mcrl/issues</bugTrackerUrl>
+    <tags>minecraft javaagent chat fabric forge quilt neoforge</tags>
+    <summary>Lift Minecraft's account chat restriction across every loader/version</summary>
+    <description>JVM javaagent that lifts Minecraft's account chat restriction, applied globally via JDK_JAVA_OPTIONS so it works across vanilla and every loader (Fabric, Forge, Quilt, NeoForge) without per-instance setup.</description>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
