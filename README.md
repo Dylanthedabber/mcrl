@@ -143,8 +143,8 @@ happened.
 This is fresh and hasn't been run at any real scale yet, just checked against real
 bytecode as described above. If you hit anything off, a version or loader combo that
 doesn't get patched, chat still blocked after install, anything weird, open an issue
-on the repo or reach out. Real reports from real use are the most useful thing right
-now.
+on the repo or message me on Discord at `sm0keskreen`. Real reports from real use are
+the most useful thing right now.
 
 ## Looking for help with a tutorial video
 
