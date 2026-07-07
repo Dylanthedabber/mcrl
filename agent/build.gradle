@@ -11,20 +11,12 @@ repositories {
 }
 
 dependencies {
-    // 9.10.1+ required: Minecraft 26.x class files report major version 69 (Java 25),
-    // which ASM 9.7 cannot even parse (throws IllegalArgumentException on every class).
+    // 9.10.1+ needed to parse Minecraft 26.x class files (Java 25).
     implementation 'org.ow2.asm:asm:9.10.1'
 }
 
 java {
-    // Target the broadest safe floor, not whatever the newest MC version needs:
-    // JDK_JAVA_OPTIONS is applied globally to every instance PrismLauncher launches,
-    // including much older Minecraft versions that run on older Java runtimes than
-    // the agent itself was built with. A too-new target doesn't just fail to patch
-    // those, the JVM refuses to load the agent at all and the whole game fails to
-    // start (confirmed live: MC 1.17 uses a Java 16 runtime, and a Java-17-targeted
-    // build crashed it with UnsupportedClassVersionError before the game even began
-    // loading). Java 8 covers effectively every Minecraft Java Edition runtime in use.
+    // Java 8 target: the lowest runtime any supported Minecraft version uses.
     sourceCompatibility = JavaVersion.VERSION_1_8
     targetCompatibility = JavaVersion.VERSION_1_8
 }
@@ -47,10 +39,7 @@ shadowJar {
     archiveClassifier.set('')
     archiveVersion.set('')
     manifest(agentManifest)
-    // -javaagent jars get appended to the system classpath, not just used for
-    // Instrumentation. Fabric Loader bundles its own ASM and refuses to start if it
-    // finds a second, differently-named-but-identical copy on the classpath, so the
-    // bundled ASM here must be relocated to a package name nothing else could have.
+    // Relocated to avoid colliding with Fabric Loader's own bundled ASM.
     relocate 'org.objectweb.asm', 'mcrl.shaded.asm'
 }
 

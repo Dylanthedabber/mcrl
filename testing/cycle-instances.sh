@@ -1,14 +1,5 @@
 #!/bin/bash
-# Launches a representative spread of PrismLauncher instances one at a time.
-# For each: launch it, give it a few seconds to start, then just wait until
-# nothing Prism-related is running anymore, the moment that happens, check for
-# a new crash report and either move on or stop. Doesn't try to precisely catch
-# the exact instance's process, just whether anything Prism-related is open.
-#
-# Requires JDK_JAVA_OPTIONS already pointed at mcrl.jar via
-#   flatpak override --user --env=JDK_JAVA_OPTIONS=... org.prismlauncher.PrismLauncher
-# (already set up earlier, every instance below inherits it automatically since
-# they all launch through the same Flatpak app).
+# Launches each PrismLauncher instance in turn and checks for a new crash report.
 
 set -u
 
@@ -44,10 +35,7 @@ PASSED=()
 STOPPED_AT=""
 
 is_anything_prism_open() {
-  # Broader and simpler than chasing the specific instance's java process: the
-  # whole PrismLauncher sandbox (launcher + game) seems to tear down together
-  # when launched this way (via --launch), so just check whether anything
-  # Prism-related is still around at all.
+  # Checks the whole sandbox, not the specific instance's process.
   pgrep -f "bwrap.*prismlauncher|PrismLauncher" >/dev/null 2>&1
 }
 

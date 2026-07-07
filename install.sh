@@ -7,9 +7,7 @@ JAR_URL="https://github.com/Sm0keSkreen/mcrl/releases/latest/download/mcrl.jar"
 DEFAULT_DIR="$HOME/.local/share/mcrl"
 TAG_LINE="# mcrl (added by install.sh)"
 
-# Known Flatpak Minecraft launchers. Flatpak apps don't see the host shell's
-# environment at all, so JDK_JAVA_OPTIONS from the rc file below never reaches
-# them, each one needs its own explicit override.
+# Known Flatpak Minecraft launchers; each needs its own explicit env override.
 KNOWN_FLATPAK_APPS="org.prismlauncher.PrismLauncher org.polymc.PolyMC com.modrinth.ModrinthApp com.mojang.Minecraft"
 
 detect_rc_file() {
