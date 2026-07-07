@@ -1,4 +1,4 @@
-# Mcrl (pronounced "em-curl"), Minecraft Chat Restrictions Lifted
+# Mcrl, Minecraft Chat Restrictions Lifted
 
 A JVM agent that clears the Microsoft/Xbox account-level "chat disabled" check on the
 Minecraft Java client. It doesn't touch chat signing or reporting, that's a separate
