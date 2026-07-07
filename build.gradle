@@ -39,6 +39,11 @@ shadowJar {
     archiveClassifier.set('')
     archiveVersion.set('')
     manifest(agentManifest)
+    // -javaagent jars get appended to the system classpath, not just used for
+    // Instrumentation. Fabric Loader bundles its own ASM and refuses to start if it
+    // finds a second, differently-named-but-identical copy on the classpath - so the
+    // bundled ASM here must be relocated to a package name nothing else could have.
+    relocate 'org.objectweb.asm', 'mcrl.shaded.asm'
 }
 
 tasks.named('build') {
