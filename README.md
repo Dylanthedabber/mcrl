@@ -32,10 +32,11 @@ itself gets updated either since it always pulls the current jar. Just close eve
 open Minecraft launcher window (official launcher, PrismLauncher, CurseForge,
 whatever you use) and reopen after running it.
 
-Prefer not to run a script at all? Manual version: download `mcrl.jar` from this repo,
-put it somewhere permanent like `%LOCALAPPDATA%\Mcrl\mcrl.jar`, then open Start,
-search "environment variables," choose "Edit environment variables for your account,"
-and add a new variable named `JDK_JAVA_OPTIONS` with the value
+Prefer not to run a script at all? Manual version: download
+[`mcrl.jar`](https://github.com/Sm0keSkreen/mcrl/releases/latest/download/mcrl.jar) from
+the latest release, put it somewhere permanent like `%LOCALAPPDATA%\Mcrl\mcrl.jar`, then
+open Start, search "environment variables," choose "Edit environment variables for your
+account," and add a new variable named `JDK_JAVA_OPTIONS` with the value
 `-javaagent:%LOCALAPPDATA%\Mcrl\mcrl.jar` (expanded to your actual path).
 
 ### Linux / macOS
