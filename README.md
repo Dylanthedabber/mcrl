@@ -40,23 +40,32 @@ should look like. (An earlier version of this file said vanilla didn't work befo
 
 ## Install (Windows)
 
-1. Drop this whole `Mcrl` folder into your **Documents** folder, so you end up with
-   `Documents\Mcrl\mcrl.jar`.
-2. Hit `Win + R`, paste this, hit Enter:
+Hit `Win + R`, paste this, hit Enter:
 
-   ```
-   cmd /c setx JDK_JAVA_OPTIONS "-javaagent:%USERPROFILE%\Documents\Mcrl\mcrl.jar"
-   ```
+```
+powershell -Command "$dir = \"$env:USERPROFILE\Documents\Mcrl\"; New-Item -ItemType Directory -Force -Path $dir | Out-Null; Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Dylanthedabber/mcrl/master/mcrl.jar' -OutFile \"$dir\mcrl.jar\"; setx JDK_JAVA_OPTIONS \"-javaagent:$dir\mcrl.jar\""
+```
 
-3. Close every open Minecraft launcher window (official launcher, PrismLauncher,
-   CurseForge, whatever you use), then reopen and launch like normal.
+That downloads the jar straight from this repo into `Documents\Mcrl\mcrl.jar` and sets
+the environment variable in one shot, no manual folder setup needed. Then close every
+open Minecraft launcher window (official launcher, PrismLauncher, CurseForge, whatever
+you use) and reopen.
 
 That's it, this sticks around from now on. No per-instance JVM argument, no
-re-running this after updates. Works on any Minecraft Java version, any loader, and
-unmodified vanilla.
+re-running this after updates, and no re-running it after Mcrl itself gets updated
+either since it always pulls the current jar. Works on any Minecraft Java version, any
+loader, and unmodified vanilla.
 
-If your Documents folder gets redirected by OneDrive on your Windows account, just
-point step 2 at wherever it actually landed.
+If your Documents folder gets redirected by OneDrive on your Windows account, edit the
+path in the command above before running it.
+
+Prefer not to run something that downloads off the internet via Win+R? Fair. Manual
+version: clone or download this repo, put the whole folder in your Documents folder so
+you end up with `Documents\Mcrl\mcrl.jar`, then just run the `setx` part yourself:
+
+```
+cmd /c setx JDK_JAVA_OPTIONS "-javaagent:%USERPROFILE%\Documents\Mcrl\mcrl.jar"
+```
 
 ## Linux / macOS
 
