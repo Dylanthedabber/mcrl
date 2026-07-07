@@ -44,7 +44,6 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
 
     private static final Set<String> LEGACY_REQUIRED = Set.of(
             "ENABLED", "DISABLED_BY_OPTIONS", "DISABLED_BY_PROFILE", "DISABLED_BY_LAUNCHER");
-    private static final String FIX_OWNER = "mcrl/agent/ChatRestrictionFix";
 
     private final Instrumentation instrumentation;
     private final AtomicReference<String> legacyEnumInternalName = new AtomicReference<>();
@@ -169,6 +168,19 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
         return found[0];
     }
 
+    /**
+     * Rewrites every ARETURN in the getter to swap a DISABLED_BY_PROFILE return
+     * value for ENABLED. Inlined entirely with java.lang.Enum/String plus the
+     * enum's own compiler-generated valueOf(String) - deliberately calls no custom
+     * helper class. Confirmed live against real Fabric: the patched class
+     * (net.minecraft.class_310) loads through Fabric's KnotClassLoader, which is
+     * isolated from whatever -javaagent added to the plain system classpath, so an
+     * INVOKESTATIC to a class living only in this agent's own jar threw
+     * NoClassDefFoundError the moment the patched method actually ran. Every class
+     * referenced here is either java.lang.* (visible from any classloader via the
+     * bootstrap loader) or the enum itself (already loaded by whatever loader owns
+     * the class being patched, since it's that method's own return type).
+     */
     private byte[] patchLegacyGetter(ClassReader reader, String enumInternalName, String className) {
         String targetDescriptor = "()L" + enumInternalName + ";";
         ClassWriter writer = newClassWriter(reader, null);
@@ -188,9 +200,19 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
                     @Override
                     public void visitInsn(int opcode) {
                         if (opcode == Opcodes.ARETURN) {
-                            super.visitMethodInsn(Opcodes.INVOKESTATIC, FIX_OWNER, "fixReturnValue",
-                                    "(Ljava/lang/Object;)Ljava/lang/Object;", false);
-                            super.visitTypeInsn(Opcodes.CHECKCAST, enumInternalName);
+                            Label notProfile = new Label();
+                            super.visitInsn(Opcodes.DUP);
+                            super.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Enum", "name",
+                                    "()Ljava/lang/String;", false);
+                            super.visitLdcInsn("DISABLED_BY_PROFILE");
+                            super.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "equals",
+                                    "(Ljava/lang/Object;)Z", false);
+                            super.visitJumpInsn(Opcodes.IFEQ, notProfile);
+                            super.visitInsn(Opcodes.POP);
+                            super.visitLdcInsn("ENABLED");
+                            super.visitMethodInsn(Opcodes.INVOKESTATIC, enumInternalName, "valueOf",
+                                    "(Ljava/lang/String;)L" + enumInternalName + ";", false);
+                            super.visitLabel(notProfile);
                         }
                         super.visitInsn(opcode);
                     }
@@ -241,7 +263,10 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
                         super.visitCode();
                         Label continueLabel = new Label();
                         super.visitVarInsn(Opcodes.ALOAD, 1);
-                        super.visitMethodInsn(Opcodes.INVOKESTATIC, FIX_OWNER, "isProfileRestriction",
+                        super.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Enum", "name",
+                                "()Ljava/lang/String;", false);
+                        super.visitLdcInsn("DISABLED_BY_PROFILE");
+                        super.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "equals",
                                 "(Ljava/lang/Object;)Z", false);
                         super.visitJumpInsn(Opcodes.IFEQ, continueLabel);
                         super.visitVarInsn(Opcodes.ALOAD, 0);
