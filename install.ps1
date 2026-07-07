@@ -12,30 +12,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $jarUrl = 'https://raw.githubusercontent.com/Dylanthedabber/mcrl/master/mcrl.jar'
 
-function Show-Frame([string]$Eyes) {
-    Write-Host ""
-    Write-Host "        /\_/\ " -ForegroundColor Cyan
-    Write-Host "       ( $Eyes )  " -ForegroundColor Cyan -NoNewline
-    Write-Host "mcrl" -ForegroundColor White -NoNewline
-    Write-Host ", chat restrictions lifted" -ForegroundColor DarkGray
-    Write-Host "        > ^ < " -ForegroundColor Cyan
-    Write-Host ""
-}
-
-function Show-Banner {
-    for ($i = 0; $i -lt 3; $i++) {
-        Clear-Host
-        Show-Frame "^.^"
-        Start-Sleep -Milliseconds 300
-        Clear-Host
-        Show-Frame "-.-"
-        Start-Sleep -Milliseconds 300
-    }
-    Clear-Host
-    Show-Frame "^.^"
-}
-
-Show-Banner
+Write-Host ""
+Write-Host "mcrl" -ForegroundColor White -NoNewline
+Write-Host ", chat restrictions lifted" -ForegroundColor DarkGray
+Write-Host ""
 
 if (-not $Uninstall -and -not $PSBoundParameters.ContainsKey('Path')) {
     Write-Host "What would you like to do?"
@@ -63,7 +43,7 @@ if ($Uninstall) {
             }
         }
         Write-Host ""
-        Write-Host "All done, meow. Close every Minecraft launcher window and reopen." -ForegroundColor Cyan
+        Write-Host "All done. Close every Minecraft launcher window and reopen." -ForegroundColor Cyan
     }
     else {
         Write-Host "Didn't find an mcrl install (JDK_JAVA_OPTIONS isn't pointed at an mcrl.jar)." -ForegroundColor Yellow
@@ -89,5 +69,5 @@ Invoke-WebRequest -Uri $jarUrl -OutFile $jarPath
 Write-Host ""
 Write-Host "Installed. JDK_JAVA_OPTIONS now points at $jarPath" -ForegroundColor Green
 Write-Host "Close every Minecraft launcher window (official launcher, PrismLauncher," -ForegroundColor DarkGray
-Write-Host "CurseForge, whatever) and reopen. Purrs." -ForegroundColor Cyan
+Write-Host "CurseForge, whatever) and reopen." -ForegroundColor Cyan
 Write-Host ""

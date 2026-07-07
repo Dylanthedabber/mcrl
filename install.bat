@@ -9,29 +9,8 @@ rem can open, read, and run avoids that pattern entirely.
 
 set "JAR_URL=https://raw.githubusercontent.com/Dylanthedabber/mcrl/master/mcrl.jar"
 
-set "BLINK=0"
-:banner_loop
-set /a BLINK+=1
-cls
 echo.
-echo       /\_/\
-echo      ( o.o )   mcrl, chat restrictions lifted
-echo       (")(")
-echo.
-timeout /t 1 /nobreak >nul
-cls
-echo.
-echo       /\_/\
-echo      ( -.- )   mcrl, chat restrictions lifted
-echo       (")(")
-echo.
-timeout /t 1 /nobreak >nul
-if %BLINK% LSS 2 goto :banner_loop
-cls
-echo.
-echo       /\_/\
-echo      ( o.o )   mcrl, chat restrictions lifted
-echo       (")(")
+echo mcrl, chat restrictions lifted
 echo.
 
 echo What would you like to do?
@@ -69,7 +48,7 @@ powershell -NoProfile -Command "[Environment]::SetEnvironmentVariable('JDK_JAVA_
 echo.
 echo Installed. JDK_JAVA_OPTIONS now points at %JAR_PATH%
 echo Close every Minecraft launcher window (official launcher, PrismLauncher,
-echo CurseForge, whatever) and reopen. Purrs.
+echo CurseForge, whatever) and reopen.
 goto :end
 
 :uninstall
@@ -99,7 +78,7 @@ if exist "%INSTALL_DIR%" (
 )
 
 echo.
-echo All done, meow. Close every Minecraft launcher window and reopen.
+echo All done. Close every Minecraft launcher window and reopen.
 goto :end
 
 :end
