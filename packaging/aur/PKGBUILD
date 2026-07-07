@@ -1,0 +1,16 @@
+# Maintainer: Sm0keSkreen
+pkgname=mcrl
+pkgver=1.2.1
+pkgrel=1
+pkgdesc="Lift Minecraft's account chat restriction across every loader/version"
+arch=('any')
+url="https://github.com/Sm0keSkreen/mcrl"
+license=('MIT')
+depends=('java-runtime')
+source=("mcrl.jar::https://github.com/Sm0keSkreen/mcrl/releases/download/v${pkgver}/mcrl.jar")
+sha256sums=('c4d99ad659bd20400dde9452b85b99737d899122ace6ac9881c2d9fef3f93e83')
+install=mcrl.install
+
+package() {
+    install -Dm644 "${srcdir}/mcrl.jar" "${pkgdir}/usr/share/mcrl/mcrl.jar"
+}

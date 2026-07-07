@@ -92,6 +92,23 @@ flatpak override --user --filesystem=/path/to:ro org.prismlauncher.PrismLauncher
 (swap `org.prismlauncher.PrismLauncher` for whichever launcher's Flatpak app ID you're
 using)
 
+### Package managers
+
+If you'd rather let a package manager track updates:
+
+- **Homebrew** (macOS/Linux): `brew install Sm0keSkreen/mcrl/mcrl`. `brew upgrade mcrl`
+  keeps the jar current at a path that never changes, so the one-time `JDK_JAVA_OPTIONS`
+  setup printed after install only needs doing once.
+- **Scoop** (Windows): `scoop bucket add mcrl https://github.com/Sm0keSkreen/scoop-mcrl`
+  then `scoop install mcrl`. `JDK_JAVA_OPTIONS` is set automatically and stays correct
+  across `scoop update mcrl`.
+- **AUR** (Arch Linux): a `PKGBUILD` lives at
+  [`packaging/aur`](packaging/aur) in this repo; see that folder for how to build/install
+  it, or submit it to the AUR yourself.
+
+Neither of these hands you the Realms/telemetry/profanity extras automatically, since
+those need `config.json`; run the full installer once for that (see above).
+
 ### Applying it to just one instance instead
 
 Everything above sets `JDK_JAVA_OPTIONS` globally, every Java program picks it up,

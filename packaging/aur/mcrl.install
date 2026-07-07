@@ -1,0 +1,19 @@
+post_install() {
+    cat <<MSG
+mcrl.jar is installed at /usr/share/mcrl/mcrl.jar
+
+This system package doesn't touch your per-user environment; one-time setup
+still needed. Put this in ~/.config/environment.d/mcrl.conf:
+  JDK_JAVA_OPTIONS=-javaagent:"/usr/share/mcrl/mcrl.jar"
+
+Or just run the full installer instead, which does this for you and also
+lets you pick the Realms/telemetry/profanity extras:
+  curl -fsSL https://github.com/Sm0keSkreen/mcrl/releases/latest/download/install.sh | bash
+
+Either way, close every open Minecraft launcher window and reopen afterward.
+MSG
+}
+
+post_upgrade() {
+    post_install
+}
