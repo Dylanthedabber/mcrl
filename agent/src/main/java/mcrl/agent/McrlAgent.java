@@ -2,7 +2,7 @@ package mcrl.agent;
 
 import java.lang.instrument.Instrumentation;
 
-// Mcrl: a JVM agent that lifts the client-side chat-restriction check, not a mod.
+// Mcrl: lifts the client-side chat-restriction check.
 public final class McrlAgent {
 
     private McrlAgent() {
