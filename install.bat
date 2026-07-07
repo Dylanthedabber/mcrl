@@ -37,7 +37,7 @@ if not exist "%JAR_PATH%" (
     goto :end
 )
 
-powershell -NoProfile -Command "[Environment]::SetEnvironmentVariable('JDK_JAVA_OPTIONS', '-javaagent:%JAR_PATH%', 'User')"
+powershell -NoProfile -Command "[Environment]::SetEnvironmentVariable('JDK_JAVA_OPTIONS', '-javaagent:\"%JAR_PATH%\"', 'User')"
 
 echo.
 echo Installed. JDK_JAVA_OPTIONS now points at %JAR_PATH%

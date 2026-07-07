@@ -91,10 +91,11 @@ if [ "$CHOICE" = "2" ]; then
     JAR_PATH=""
 
     if [ -f "$LAUNCH_AGENT_PLIST" ]; then
-        LINE=$(grep -o 'javaagent:[^<]*mcrl\.jar' "$LAUNCH_AGENT_PLIST" | head -n1 || true)
+        LINE=$(grep -o 'javaagent:.*mcrl\.jar' "$LAUNCH_AGENT_PLIST" | head -n1 || true)
         if [ -n "$LINE" ]; then
             FOUND=1
             JAR_PATH="${LINE#javaagent:}"
+            JAR_PATH="${JAR_PATH#\"}"
             launchctl bootout "gui/$(id -u)" "$LAUNCH_AGENT_PLIST" >/dev/null 2>&1 || true
             launchctl unsetenv JDK_JAVA_OPTIONS >/dev/null 2>&1 || true
             rm -f "$LAUNCH_AGENT_PLIST"
@@ -103,21 +104,26 @@ if [ "$CHOICE" = "2" ]; then
     fi
 
     if [ -f "$ENV_D_FILE" ]; then
-        LINE=$(grep -o 'javaagent:[^"]*mcrl\.jar' "$ENV_D_FILE" | head -n1 || true)
+        LINE=$(grep -o 'javaagent:.*mcrl\.jar' "$ENV_D_FILE" | head -n1 || true)
         if [ -n "$LINE" ]; then
             FOUND=1
-            JAR_PATH="${JAR_PATH:-${LINE#javaagent:}}"
+            EXTRACTED="${LINE#javaagent:}"
+            EXTRACTED="${EXTRACTED#\"}"
+            JAR_PATH="${JAR_PATH:-$EXTRACTED}"
             rm -f "$ENV_D_FILE"
             echo "Removed $ENV_D_FILE."
         fi
     fi
 
     if [ -f "$RC_FILE" ]; then
-        LINE=$(grep -o 'javaagent:[^"]*mcrl\.jar' "$RC_FILE" | head -n1 || true)
+        LINE=$(grep -o 'javaagent:.*mcrl\.jar' "$RC_FILE" | head -n1 || true)
         if [ -n "$LINE" ]; then
             FOUND=1
-            JAR_PATH="${JAR_PATH:-${LINE#javaagent:}}"
-            grep -vx -e "$TAG_LINE" -e 'export JDK_JAVA_OPTIONS="-javaagent:.*mcrl\.jar"' "$RC_FILE" > "$RC_FILE.mcrl_tmp" \
+            EXTRACTED="${LINE#javaagent:}"
+            EXTRACTED="${EXTRACTED#\\}"
+            EXTRACTED="${EXTRACTED#\"}"
+            JAR_PATH="${JAR_PATH:-$EXTRACTED}"
+            grep -vx -e "$TAG_LINE" -e 'export JDK_JAVA_OPTIONS=.*mcrl\.jar.*' "$RC_FILE" > "$RC_FILE.mcrl_tmp" \
                 && mv "$RC_FILE.mcrl_tmp" "$RC_FILE"
             echo "Removed the JDK_JAVA_OPTIONS line from $RC_FILE."
         fi
@@ -129,6 +135,8 @@ if [ "$CHOICE" = "2" ]; then
             if echo "$CURRENT_OVERRIDE" | grep -q 'mcrl\.jar'; then
                 FOUND=1
                 APP_JAR_PATH="${CURRENT_OVERRIDE#JDK_JAVA_OPTIONS=-javaagent:}"
+                APP_JAR_PATH="${APP_JAR_PATH#\"}"
+                APP_JAR_PATH="${APP_JAR_PATH%\"}"
                 JAR_PATH="${JAR_PATH:-$APP_JAR_PATH}"
                 flatpak override --user --unset-env=JDK_JAVA_OPTIONS "$APP"
                 flatpak override --user --nofilesystem="$(dirname "$APP_JAR_PATH")" "$APP"
@@ -193,7 +201,7 @@ if is_macos; then
         <string>/bin/launchctl</string>
         <string>setenv</string>
         <string>JDK_JAVA_OPTIONS</string>
-        <string>-javaagent:$JAR_PATH</string>
+        <string>-javaagent:"$JAR_PATH"</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -206,7 +214,7 @@ PLIST
     NATIVE_NOTE="already active for this login session, no restart needed for it specifically"
 elif has_systemd_user; then
     mkdir -p "$(dirname "$ENV_D_FILE")"
-    echo "JDK_JAVA_OPTIONS=\"-javaagent:$JAR_PATH\"" > "$ENV_D_FILE"
+    echo "JDK_JAVA_OPTIONS=-javaagent:\"$JAR_PATH\"" > "$ENV_D_FILE"
     echo "Wrote $ENV_D_FILE (covers native, non-Flatpak launchers)."
     NATIVE_NOTE="systemd only reads environment.d at session start, so log out and back in"
 else
@@ -216,7 +224,7 @@ else
         {
             echo ""
             echo "$TAG_LINE"
-            echo "export JDK_JAVA_OPTIONS=\"-javaagent:$JAR_PATH\""
+            echo "export JDK_JAVA_OPTIONS=\"-javaagent:\\\"$JAR_PATH\\\"\""
         } >> "$RC_FILE"
         echo "Added JDK_JAVA_OPTIONS to $RC_FILE (covers native, non-Flatpak launchers)."
     else
@@ -229,7 +237,7 @@ FLATPAK_TARGETS="$(select_flatpak_targets)"
 if [ -n "$FLATPAK_TARGETS" ]; then
     while IFS= read -r APP; do
         [ -z "$APP" ] && continue
-        flatpak override --user --env=JDK_JAVA_OPTIONS="-javaagent:$JAR_PATH" "$APP"
+        flatpak override --user --env=JDK_JAVA_OPTIONS="-javaagent:\"$JAR_PATH\"" "$APP"
         flatpak override --user --filesystem="$INSTALL_DIR:ro" "$APP"
         echo "Set the Flatpak override for $APP."
     done <<< "$FLATPAK_TARGETS"

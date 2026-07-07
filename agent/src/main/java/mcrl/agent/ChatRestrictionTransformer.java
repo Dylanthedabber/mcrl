@@ -37,9 +37,9 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
         if (className == null || classfileBuffer == null) {
             return null;
         }
-        // Skips bootstrap/JDK classes; touching those here can crash with ClassCircularityError.
+        // Skips bootstrap/JDK/our-own-shaded classes; touching those here can crash with ClassCircularityError.
         if (loader == null || className.startsWith("java/") || className.startsWith("javax/")
-                || className.startsWith("jdk/") || className.startsWith("sun/")) {
+                || className.startsWith("jdk/") || className.startsWith("sun/") || className.startsWith("mcrl/")) {
             return null;
         }
         try {
@@ -61,7 +61,7 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
 
             String legacyName = legacyEnumInternalName.get();
             if (legacyName != null && hasLegacyGetter(reader, legacyName)) {
-                return patchLegacyGetter(reader, legacyName, className);
+                return patchLegacyGetter(reader, legacyName, className, loader);
             }
             if (legacyName == null) {
                 for (String candidate : discoverLegacyGetterCandidates(reader)) {
@@ -70,7 +70,7 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
                             System.out.println("[mcrl] found legacy chat-restriction enum: " + candidate
                                     + " (via getter in " + className + ")");
                         }
-                        return patchLegacyGetter(reader, candidate, className);
+                        return patchLegacyGetter(reader, candidate, className, loader);
                     }
                 }
             }
@@ -191,9 +191,9 @@ public class ChatRestrictionTransformer implements ClassFileTransformer {
     }
 
     // Rewrites every ARETURN in the getter to swap a DISABLED_BY_PROFILE return for ENABLED.
-    private byte[] patchLegacyGetter(ClassReader reader, String enumInternalName, String className) {
+    private byte[] patchLegacyGetter(ClassReader reader, String enumInternalName, String className, ClassLoader loader) {
         String targetDescriptor = "()L" + enumInternalName + ";";
-        ClassWriter writer = newClassWriter(reader, null);
+        ClassWriter writer = newClassWriter(reader, loader);
         boolean[] patched = {false};
 
         ClassVisitor classVisitor = new ClassVisitor(Opcodes.ASM9, writer) {
