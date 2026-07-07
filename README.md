@@ -1,123 +1,126 @@
 # Mcrl (pronounced "em-curl") - Minecraft Chat Restrictions Lifted
 
-A JVM agent that clears the Microsoft/Xbox account-level "chat disabled" gate on the
-Minecraft Java client. It does not touch chat signing/reporting - see the "What this
-does and doesn't do" section below.
+A JVM agent that clears the Microsoft/Xbox account-level "chat disabled" check on the
+Minecraft Java client. It doesn't touch chat signing or reporting, that's a separate
+system (see below).
 
-It's a `-javaagent`, not a mod, so it attaches below whatever mod loader (or nothing)
-is running, and matches its target by shape rather than by class/method name - so the
-same jar works across loaders, and on unmodified vanilla, without a rebuild per loader.
-Two real shapes exist depending on the game's era, and this agent handles both:
+It's a `-javaagent`, not a mod, so it sits below whatever loader you're running, or
+nothing at all. Instead of hardcoding a class or method name, it matches by shape, so
+one jar covers every loader and unmodified vanilla without a rebuild. Two shapes
+actually exist depending on how old the game is:
 
-- **1.19 - 1.21.11**: a single enum with constants `ENABLED`, `DISABLED_BY_OPTIONS`,
-  `DISABLED_BY_PROFILE`, `DISABLED_BY_LAUNCHER`.
-- **26.1+**: Mojang restructured this into a `ChatAbilities` object built from a set of
-  `ChatRestriction` reasons (no more `ENABLED` constant - "no restriction" is just an
-  empty set). Matched by the fluent `addRestriction(ChatRestriction) -> same type`
-  method shape instead.
+- **1.19 through 1.21.11**: a single enum with four constants, `ENABLED`,
+  `DISABLED_BY_OPTIONS`, `DISABLED_BY_PROFILE`, `DISABLED_BY_LAUNCHER`.
+- **26.1 and up**: Mojang rebuilt this into a `ChatAbilities` object made from a set of
+  `ChatRestriction` reasons, no more `ENABLED` constant, "no restriction" just means an
+  empty set. This gets matched by its fluent `addRestriction(ChatRestriction) -> same
+  type` method instead.
 
-The key design point, found the hard way (see below): every class/method/field
-*symbol* name in the game gets renamed depending on context - Mojang's own obfuscation
-in the raw vanilla jar, Forge/NeoForge's official-Mojang-mapping remap, Fabric/Quilt's
-"Intermediary" remap (a *different*, synthetic, non-human-readable scheme from the
-Yarn names you see in a dev environment - production Fabric/Quilt never uses those).
-So this agent doesn't match on any symbol name at all. Instead it reads the literal
-string arguments baked into the enum's own `<clinit>` (the `"ENABLED"`,
-`"DISABLED_BY_PROFILE"`, etc. that every enum constant passes to its constructor) -
-those survive every renaming scheme unchanged, because obfuscators rename symbols, not
-arbitrary string literals, and the game itself depends on these particular strings
-staying intact for `Enum.name()`/`valueOf()` and other data-driven lookups to work.
-That one property is what makes a single jar cover vanilla and every loader at once.
+The thing that took the longest to figure out: every class, method, and field name in
+the game gets renamed depending on what's running it. Raw vanilla is obfuscated by
+Mojang. Forge and NeoForge remap to Mojang's own official names. Fabric and Quilt
+remap to something called "Intermediary," a different, synthetic scheme, not the
+human-readable Yarn names you'd see while developing a mod (production Fabric never
+uses those, only the dev environment does). So none of this agent's matching relies on
+a name at all. It reads the literal strings baked into each enum constant's own
+constructor call, the actual text `"ENABLED"`, `"DISABLED_BY_PROFILE"`, and so on.
+Those survive every renaming scheme because obfuscators rename symbols, not the string
+literals sitting in the bytecode, and the game itself needs those exact strings to
+keep working for `Enum.name()` and `valueOf()`. That's the one property that lets a
+single jar cover vanilla and every loader at once.
 
-**Verified against real bytecode, not assumed:** every one of the 24 release versions
-from 1.19 through 1.21.11, plus 26.1 and 26.2, checked directly against the *raw,
-unmodified* client jar Mojang actually ships (no remapping applied at all) - confirming
-true vanilla works for the entire version range, not just 26.x. Additionally
-cross-checked against real Fabric Loader "Intermediary" production bytecode
-(remapped with Fabric's own `tiny-remapper` tool and official mappings, not a
-hand-rolled approximation) to confirm Fabric/Quilt production environments match too.
-An earlier version of this doc claimed vanilla didn't work pre-26.1 - that was wrong,
-caused by a flawed test (`grep` silently skipping binary files without `-a`), corrected
-once the mistake was found by testing more rigorously.
+This has actually been checked against real bytecode, not just assumed to work. All 24
+release versions from 1.19 through 1.21.11, plus 26.1 and 26.2, tested against the raw
+client jar Mojang ships with no remapping applied, confirming vanilla works across the
+whole range, not just 26.x. Also cross-checked against real Fabric "Intermediary"
+production bytecode using Fabric's own tiny-remapper tool, not a guess at what it
+should look like. (An earlier version of this file said vanilla didn't work before
+26.1. That was wrong, caused by a `grep` call that silently skips binary files without
+`-a`. Found and fixed once testing got more rigorous.)
 
 ## Install (Windows)
 
-1. Put this whole `Mcrl` folder inside your **Documents** folder, so the jar ends up at:
-   `Documents\Mcrl\mcrl.jar`
-2. Press `Win + R`, paste this, press Enter:
+1. Drop this whole `Mcrl` folder into your **Documents** folder, so you end up with
+   `Documents\Mcrl\mcrl.jar`.
+2. Hit `Win + R`, paste this, hit Enter:
 
    ```
    cmd /c setx JDK_JAVA_OPTIONS "-javaagent:%USERPROFILE%\Documents\Mcrl\mcrl.jar"
    ```
 
-3. Close every Minecraft launcher window that's currently open (official launcher,
-   PrismLauncher, CurseForge, whatever), then reopen and launch normally.
+3. Close every open Minecraft launcher window (official launcher, PrismLauncher,
+   CurseForge, whatever you use), then reopen and launch like normal.
 
-That's it. This applies automatically from now on - no per-instance JVM argument,
-no re-running this after launcher/game updates. Works for any Minecraft Java version,
-any loader (Forge, NeoForge, Fabric, Quilt), and unmodified vanilla.
+That's it, this sticks around from now on. No per-instance JVM argument, no
+re-running this after updates. Works on any Minecraft Java version, any loader, and
+unmodified vanilla.
 
-If your Windows account's Documents folder is redirected by OneDrive (some setups
-move it to `...\OneDrive\Documents`), point the path in step 2 at wherever the folder
-actually landed instead.
+If your Documents folder gets redirected by OneDrive on your Windows account, just
+point step 2 at wherever it actually landed.
 
 ## Linux / macOS
 
-Same idea, no launcher-sandbox issues on macOS. On Linux, if your launcher is a
-Flatpak (e.g. PrismLauncher), a plain shell environment variable won't reach it - use:
+Same idea. macOS has no launcher-sandbox issues to worry about. On Linux, if you're
+running a Flatpak launcher (PrismLauncher, for example), a plain shell environment
+variable won't reach it, so use this instead:
 
 ```
 flatpak override --user --env=JDK_JAVA_OPTIONS='-javaagent:/path/to/Mcrl/mcrl.jar' org.prismlauncher.PrismLauncher
 ```
 
-For a native (non-Flatpak) install, add to your shell profile (`~/.bashrc`, `~/.zshrc`,
-or macOS equivalent):
+For a native, non-Flatpak install, just add this to your shell profile (`~/.bashrc`,
+`~/.zshrc`, or the macOS equivalent):
 
 ```
 export JDK_JAVA_OPTIONS="-javaagent:/path/to/Mcrl/mcrl.jar"
 ```
 
-## What this does and doesn't do
+## What it actually touches
 
-- **Does:** overrides the client-side `DISABLED_BY_PROFILE` chat gate (the check tied
-  to the Microsoft/Xbox account's "Online Safety" / communication privacy setting) so
-  the game always allows chat, regardless of that account flag. Every other
-  restriction reason (`DISABLED_BY_OPTIONS`, `DISABLED_BY_LAUNCHER`, and their 26.x
-  equivalents) is left untouched.
-- **Doesn't:** touch chat message signing or the report-to-Mojang pipeline introduced
-  in 1.19. That's a separate, much larger system (packet structure, not a simple enum
-  gate) handled by unrelated tools like No Chat Reports / FreedomChat.
-- **Side effect:** `JDK_JAVA_OPTIONS` applies to *every* Java program you run
-  afterward, not just Minecraft. Harmless functionally (the agent no-ops on anything
-  that isn't the game), but you'll see a one-line notice print to the console of any
-  unrelated Java program you run.
-- **Requires Java 17+ to run the agent itself**, same as Minecraft's own minimum for
-  1.19+.
+It overrides the `DISABLED_BY_PROFILE` check specifically, the one tied to your
+Microsoft/Xbox account's "Online Safety" or communication privacy setting, so the game
+reports chat as allowed no matter what that flag says. Everything else,
+`DISABLED_BY_OPTIONS`, `DISABLED_BY_LAUNCHER`, and their 26.x equivalents, gets left
+alone.
 
-## Version coverage (verified against real bytecode, not assumed)
+It does not touch chat message signing or the report-to-Mojang pipeline that came in
+with 1.19. That's a much bigger system built around packet structure rather than a
+simple enum check, and it's handled by other tools like No Chat Reports or
+FreedomChat, not this one.
+
+One side effect worth knowing about: `JDK_JAVA_OPTIONS` is a global setting, so it
+applies to every Java program you run afterward, not just Minecraft. It's harmless
+since the agent does nothing on anything that isn't the game, but you will see a
+one-line notice print to the console of whatever else you run.
+
+The agent itself needs Java 8 or newer to even load, which is about as broad as
+Minecraft's own runtime requirements get across every version.
+
+## Version coverage
+
+Checked against real bytecode, not assumed:
 
 | Range | Shape matched | Vanilla | Forge / NeoForge | Fabric / Quilt |
 |---|---|---|---|---|
 | 1.19 - 1.21.11 (24 releases) | legacy enum getter | Yes | Yes | Yes |
 | 26.1, 26.2 | modern `ChatAbilities` builder | Yes | Yes* | Yes* |
 
-\* 26.x mod loader support depends on those projects having caught up to a
-version-only-months-old release; the agent itself doesn't care whether a loader is
-present at all, so this is really "does a loader for 26.x exist yet", not a limitation
-of this agent.
+\* Whether a Forge/NeoForge or Fabric/Quilt build for 26.x actually exists yet is
+really a question about those projects catching up to a version that's only months
+old, not a limitation of this agent. It doesn't care whether a loader is present at
+all.
 
-If a future version restructures the feature again in a way that matches neither
-shape, the agent simply never finds anything to patch - it prints its install banner
-but no `found ... enum` / `patching ...` lines, which is how you'd notice it isn't
-doing anything on that version.
+If some future version restructures the feature again in a way that matches neither
+shape, the agent just won't find anything to patch. You'll see its install banner
+print but no "found... enum" or "patching..." lines, which is how you'd notice nothing
+happened.
 
 ## Building from source
 
-Requires JDK 17+ and network access for Gradle to fetch dependencies (ASM) and the
-Shadow plugin.
+Needs JDK 17+ and network access so Gradle can pull down ASM and the Shadow plugin.
 
 ```
 ./gradlew shadowJar   # or: gradle shadowJar
 ```
 
-Output: `build/libs/mcrl.jar`.
+Output lands at `build/libs/mcrl.jar`.

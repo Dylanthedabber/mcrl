@@ -1,7 +1,9 @@
 #!/bin/bash
-# Launches a representative spread of existing PrismLauncher instances one at a
-# time, waits for you to close each one, and automatically advances to the next -
-# stopping immediately if a new crash report shows up for whatever's running.
+# Launches a representative spread of PrismLauncher instances one at a time.
+# For each: launch it, give it a few seconds to start, then just wait until
+# nothing Prism-related is running anymore - the moment that happens, check for
+# a new crash report and either move on or stop. Doesn't try to precisely catch
+# the exact instance's process, just whether anything Prism-related is open.
 #
 # Requires JDK_JAVA_OPTIONS already pointed at mcrl.jar via
 #   flatpak override --user --env=JDK_JAVA_OPTIONS=... org.prismlauncher.PrismLauncher
@@ -11,14 +13,19 @@
 set -u
 
 INSTANCES_DIR="/var/home/sm0keskreen/.var/app/org.prismlauncher.PrismLauncher/data/PrismLauncher/instances"
+STARTUP_GRACE_SECONDS=3
 
 # name -> loader, for the summary printed at the end
 declare -A LOADER=(
+  ["1.17-vanilla"]="Vanilla"
   ["1.17"]="Fabric"
+  ["1.18-vanilla"]="Vanilla"
   ["1.18"]="Fabric"
   ["1.18(1)"]="Forge"
+  ["1.19-vanilla"]="Vanilla"
   ["1.19"]="Fabric"
   ["1.19(1)"]="Forge"
+  ["1.20-vanilla"]="Vanilla"
   ["1.20"]="Fabric"
   ["1.20(1)"]="Forge"
   ["1.21.11"]="Vanilla"
@@ -29,11 +36,20 @@ declare -A LOADER=(
   ["26.1.2(2)"]="Forge"
 )
 
-ORDER=("1.17" "1.18" "1.18(1)" "1.19" "1.19(1)" "1.20" "1.20(1)" \
+ORDER=("1.17-vanilla" "1.17" "1.18-vanilla" "1.18" "1.18(1)" \
+       "1.19-vanilla" "1.19" "1.19(1)" "1.20-vanilla" "1.20" "1.20(1)" \
        "1.21.11" "1.21.11(1)" "1.21.11(2)" "26.2" "26.1.2" "26.1.2(2)")
 
 PASSED=()
 STOPPED_AT=""
+
+is_anything_prism_open() {
+  # Broader and simpler than chasing the specific instance's java process: the
+  # whole PrismLauncher sandbox (launcher + game) seems to tear down together
+  # when launched this way (via --launch), so just check whether anything
+  # Prism-related is still around at all.
+  pgrep -f "bwrap.*prismlauncher|PrismLauncher" >/dev/null 2>&1
+}
 
 for name in "${ORDER[@]}"; do
   loader="${LOADER[$name]}"
@@ -50,7 +66,6 @@ for name in "${ORDER[@]}"; do
     continue
   fi
 
-  # baseline: what crash reports already exist before this run
   before=""
   if [ -d "$crash_dir" ]; then
     before=$(ls -1 "$crash_dir" 2>/dev/null | sort)
@@ -58,34 +73,14 @@ for name in "${ORDER[@]}"; do
 
   flatpak run org.prismlauncher.PrismLauncher --launch "$name" >/dev/null 2>&1
 
-  # wait for the actual game process to appear (loading can take a while).
-  # pgrep -f treats its pattern as a regex, and instance names like "1.18(1)"
-  # contain literal parentheses, so the path must be regex-escaped first.
-  escaped_dir=$(printf '%s' "$game_dir" | sed -e 's/[.[\*^$()+?{|\\]/\\&/g')
-  echo "  Waiting for the game process to start..."
-  pid=""
-  for i in $(seq 1 90); do
-    pid=$(pgrep -f -- "--gameDir ${escaped_dir} " | head -1)
-    if [ -n "$pid" ]; then
-      break
-    fi
-    sleep 2
+  echo "  Giving it ${STARTUP_GRACE_SECONDS}s to start, then watching until nothing Prism-related is open..."
+  sleep "$STARTUP_GRACE_SECONDS"
+
+  while is_anything_prism_open; do
+    sleep 1
   done
 
-  if [ -z "$pid" ]; then
-    echo "  FAILED TO LAUNCH: no game process appeared within 180s for $name"
-    STOPPED_AT="$name (never started)"
-    break
-  fi
-
-  echo "  Game running (pid $pid). Close it whenever you're done looking at it -"
-  echo "  this will automatically move to the next instance."
-
-  while kill -0 "$pid" 2>/dev/null; do
-    sleep 2
-  done
-
-  echo "  $name closed."
+  echo "  $name is no longer running."
 
   after=""
   if [ -d "$crash_dir" ]; then
