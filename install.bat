@@ -84,17 +84,86 @@ echo mcrl, chat restrictions lifted
 echo.
 
 if /i "%~1"=="configure" goto :configure_only
+if /i "%~1"=="status" goto :status_only
+if /i "%~1"=="help" goto :show_help
+if /i "%~1"=="/?" goto :show_help
+if /i "%~1"=="--help" goto :show_help
+if /i "%~1"=="-h" goto :show_help
 
 echo What would you like to do?
 echo   [1] Install (default)
 echo   [2] Uninstall
 echo   [3] Reconfigure (change Realms/telemetry/profanity choices)
 echo   [4] Upgrade (re-download the jar, keep everything else)
-set /p "CHOICE=Choose 1-4: "
+echo   [5] Status (show current install/config)
+set /p "CHOICE=Choose 1-5: "
 if "%CHOICE%"=="2" goto :uninstall
 if "%CHOICE%"=="3" goto :reconfigure
 if "%CHOICE%"=="4" goto :upgrade
+if "%CHOICE%"=="5" goto :status
 goto :install
+
+:show_help
+echo mcrl installer for Windows.
+echo.
+echo Usage:
+echo   install.bat
+echo       Interactive menu: install, uninstall, reconfigure, upgrade, or status.
+echo.
+echo   install.bat status
+echo       Show the registered jar path, whether it exists, config.json's contents
+echo       (or its absence), and JDK_JAVA_OPTIONS. Same as menu option 5.
+echo.
+echo   install.bat configure "C:\path\to\directory-containing-mcrl.jar" [extras true/false] [telemetry true/false] [profanity true/false]
+echo       Write config.json into an existing install directory without the
+echo       interactive menu; any value left out still prompts for that one choice.
+echo       Used by package managers that manage the jar themselves.
+echo.
+echo   install.bat help ^| /? ^| --help ^| -h
+echo       Show this message.
+endlocal
+exit /b 0
+
+REM Read-only: prints the registered jar path, whether it actually exists, config.json's
+REM contents (or its absence), and the persisted JDK_JAVA_OPTIONS value, so a user with "chat
+REM still blocked" has somewhere to look before opening an issue.
+:show_status
+call :find_existing_jar
+if "%JAR_PATH_FOUND%"=="0" (
+    echo No mcrl install found, JDK_JAVA_OPTIONS isn't pointed at an mcrl.jar.
+    goto :eof
+)
+echo Registered jar path: %JAR_PATH%
+if exist "%JAR_PATH%" (
+    echo   jar file exists.
+) else (
+    echo   WARNING: jar file does not exist at that path. Run Upgrade or Install again.
+)
+for %%F in ("%JAR_PATH%") do set "STATUS_DIR=%%~dpF"
+if exist "%STATUS_DIR%config.json" (
+    echo config.json at %STATUS_DIR%config.json:
+    type "%STATUS_DIR%config.json"
+) else (
+    echo No config.json next to the jar; extras off, telemetry/profanity left alone.
+)
+set "STATUS_ENV="
+for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('JDK_JAVA_OPTIONS','User')"`) do set "STATUS_ENV=%%A"
+if "%STATUS_ENV%"=="" (
+    echo JDK_JAVA_OPTIONS is not set.
+) else (
+    echo JDK_JAVA_OPTIONS: %STATUS_ENV%
+)
+goto :eof
+
+:status_only
+call :show_status
+endlocal
+exit /b 0
+
+:status
+echo.
+call :show_status
+goto :end
 
 :configure_only
 REM For package managers (Chocolatey, etc.) that already know exactly where their own jar

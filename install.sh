@@ -138,6 +138,40 @@ CONFIGJSON
     echo "Wrote $target_dir/config.json."
 }
 
+# Read-only: prints the registered jar path, whether it actually exists, config.json's
+# contents (or its absence), and JDK_JAVA_OPTIONS in the current shell, so a user with "chat
+# still blocked" has somewhere to look before opening an issue.
+show_status() {
+    echo ""
+    local jar_path
+    jar_path="$(find_existing_jar_path || true)"
+    if [ -z "$jar_path" ]; then
+        echo "No mcrl install found (checked LaunchAgent, $ENV_D_FILE, $(detect_rc_file), Flatpak overrides)."
+        return
+    fi
+    echo "Registered jar path: $jar_path"
+    if [ -f "$jar_path" ]; then
+        echo "  jar file exists."
+    else
+        echo "  WARNING: jar file does not exist at that path. Run Upgrade or Install again."
+    fi
+
+    local config_file="$(dirname "$jar_path")/config.json"
+    if [ -f "$config_file" ]; then
+        echo "config.json ($config_file):"
+        sed 's/^/  /' "$config_file"
+    else
+        echo "No config.json next to the jar; extras off, telemetry/profanity left alone."
+    fi
+
+    if [ -n "${JDK_JAVA_OPTIONS:-}" ]; then
+        echo "JDK_JAVA_OPTIONS in this shell: $JDK_JAVA_OPTIONS"
+    else
+        echo "JDK_JAVA_OPTIONS is not set in this shell (a new terminal/session may still have"
+        echo "it correctly; this only reflects the shell running this script)."
+    fi
+}
+
 list_installed_flatpak_apps() {
     command -v flatpak >/dev/null 2>&1 && flatpak list --app --columns=application,name 2>/dev/null
 }
@@ -183,10 +217,38 @@ select_flatpak_targets() {
     done
 }
 
-# For package managers (Homebrew, AUR, etc.) that already know exactly where their own jar
-# lives: writes config.json there directly, skipping the interactive menu entirely. Any of the
-# three toggles can be preset via flags for fully non-interactive/scripted use; whichever aren't
-# still prompt normally.
+# For package managers (Homebrew, etc.) that already know exactly where their own jar lives:
+# writes config.json there directly, skipping the interactive menu entirely. Any of the three
+# toggles can be preset via flags for fully non-interactive/scripted use; whichever aren't still
+# prompt normally.
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<USAGE
+mcrl installer for Linux/macOS.
+
+Usage:
+  install.sh
+      Interactive menu: install, uninstall, reconfigure, upgrade, or status.
+
+  install.sh status
+      Show the registered jar path, whether it exists, config.json's contents (or its
+      absence), and JDK_JAVA_OPTIONS in the current shell. Same as menu option 5.
+
+  install.sh --configure-only <directory-containing-mcrl.jar> [--extras=true|false] [--telemetry=true|false] [--profanity=true|false]
+      Write config.json into an existing install directory without the interactive
+      menu; any flag left out still prompts for that one choice. Used by package
+      managers that manage the jar themselves.
+
+  install.sh --help | -h
+      Show this message.
+USAGE
+    exit 0
+fi
+
+if [ "${1:-}" = "status" ]; then
+    show_status
+    exit 0
+fi
+
 if [ "${1:-}" = "--configure-only" ]; then
     CONFIGURE_DIR="${2:-}"
     if [ -z "$CONFIGURE_DIR" ] || [ ! -d "$CONFIGURE_DIR" ]; then
@@ -216,7 +278,13 @@ echo "  [1] Install (default)"
 echo "  [2] Uninstall"
 echo "  [3] Reconfigure (change Realms/telemetry/profanity choices)"
 echo "  [4] Upgrade (re-download the jar, keep everything else)"
-read -r -p "Choose 1-4: " CHOICE
+echo "  [5] Status (show current install/config)"
+read -r -p "Choose 1-5: " CHOICE
+
+if [ "$CHOICE" = "5" ]; then
+    show_status
+    exit 0
+fi
 
 if [ "$CHOICE" = "3" ]; then
     echo ""
