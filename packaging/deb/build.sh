@@ -3,12 +3,15 @@
 # an ar archive of debian-binary + control.tar.gz + data.tar.gz). Run from this directory.
 set -euo pipefail
 
-VERSION="1.3.0"
-JAR_URL="https://github.com/Sm0keSkreen/mcrl/releases/download/v${VERSION}/mcrl.jar"
+# Jar version (matches an mcrl release tag) vs package version (control's Version:, which can
+# get a -N debian_revision bump for packaging-only changes without a new jar release).
+JAR_VERSION="1.3.0"
+PKG_VERSION="1.3.0-2"
+JAR_URL="https://github.com/Sm0keSkreen/mcrl/releases/download/v${JAR_VERSION}/mcrl.jar"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-echo "Fetching mcrl.jar ${VERSION}..."
+echo "Fetching mcrl.jar ${JAR_VERSION}..."
 curl -fLsS -o "$WORK/mcrl.jar" "$JAR_URL"
 
 mkdir -p "$WORK/control" "$WORK/data/usr/share/mcrl"
@@ -22,7 +25,7 @@ echo "2.0" > "$WORK/debian-binary"
 ( cd "$WORK/control" && tar --owner=root --group=root -czf ../control.tar.gz ./control ./postinst )
 ( cd "$WORK/data" && tar --owner=root --group=root -czf ../data.tar.gz ./usr )
 
-OUT="mcrl_${VERSION}_all.deb"
+OUT="mcrl_${PKG_VERSION}_all.deb"
 ( cd "$WORK" && ar rc "$OUT" debian-binary control.tar.gz data.tar.gz )
 mv "$WORK/$OUT" "$OUT"
 
