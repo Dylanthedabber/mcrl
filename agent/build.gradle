@@ -6,7 +6,7 @@ plugins {
 group = 'mcrl'
 // Kept in sync with the git tag each release is cut from; read back at runtime via
 // Implementation-Version for the update checker to compare against GitHub's latest release.
-version = '1.3.2'
+version = '1.3.3'
 
 repositories {
     mavenCentral()
