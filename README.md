@@ -103,8 +103,10 @@ If you'd rather let a package manager track updates. Ready to install right now:
   then `scoop install mcrl`. `JDK_JAVA_OPTIONS` is set automatically and stays correct
   across `scoop update mcrl`.
 - **Nix**: `nix profile install github:Sm0keSkreen/nix-mcrl`, or use the included
-  home-manager module (`programs.mcrl.enable = true;`) to also get `JDK_JAVA_OPTIONS`
-  set for you. See [that repo](https://github.com/Sm0keSkreen/nix-mcrl) for details.
+  home-manager module to also get `JDK_JAVA_OPTIONS` set and the Realms/telemetry/
+  profanity extras declared right in your config (`programs.mcrl = { enable = true;
+  extras = true; allowTelemetry = false; };`), no separate script to run. See
+  [that repo](https://github.com/Sm0keSkreen/nix-mcrl) for details.
 
 Scoop's and Nix's packages couldn't be tested on their real platforms from here (this
 was built on Linux without Windows or without installing Nix itself); the formats are
@@ -126,8 +128,13 @@ the repo owner can set up:
 
 Each folder's README explains how to build/install it yourself or publish it properly.
 
-None of these hand you the Realms/telemetry/profanity extras automatically, since
-those need `config.json`; run the full installer once for that (see above).
+Every option above except Nix (which declares the extras directly, see above) installs
+the jar and, where the format supports it, the environment variable, but not
+`config.json`. Each one prints a ready-to-run command for that, install.sh/install.bat
+gained a `--configure-only`/`configure` mode that writes config.json straight into a
+given directory (the package's own fixed install path), skipping the interactive 1-4
+menu entirely and supporting flags (`--extras=true`, etc.) for fully scripted setups
+too.
 
 ### Applying it to just one instance instead
 
