@@ -113,18 +113,14 @@ was built on Linux without Windows or without installing Nix itself); the format
 well-understood and Homebrew's equivalent worked cleanly, but if something's off with
 either, open an issue.
 
-Packaging source lives in this repo but isn't published anywhere yet, each of these
-needs an account on that ecosystem's own registry to actually publish, something only
-the repo owner can set up:
+Packaging source lives in this repo but isn't published anywhere yet:
 
-- **AUR** (Arch Linux): [`packaging/aur`](packaging/aur)
-- **Chocolatey** (Windows): [`packaging/chocolatey`](packaging/chocolatey)
-- **MacPorts** (macOS): [`packaging/macports`](packaging/macports)
+- **Chocolatey** (Windows): [`packaging/chocolatey`](packaging/chocolatey). Publishing to
+  the community repository needs its own account; see that folder for building/installing
+  locally without one instead.
 - **.deb** (Debian/Ubuntu): [`packaging/deb`](packaging/deb), a standalone installable
-  package (build script verified working here), not an APT repo, so it won't auto-update
-  via `apt upgrade`.
-- **.rpm** (Fedora/RHEL): [`packaging/rpm`](packaging/rpm), spec file only, `rpmbuild`
-  wasn't available to build/test it here.
+  package (build script verified working here, no account needed at all), not an APT
+  repo, so it won't auto-update via `apt upgrade`.
 
 Each folder's README explains how to build/install it yourself or publish it properly.
 
